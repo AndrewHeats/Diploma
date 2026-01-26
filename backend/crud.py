@@ -1,19 +1,30 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-import models
-import schemas
-from passlib.context import CryptContext
+import models, schemas
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# --- Операції з Користувачами ---
+def get_user_by_email(db: Session, email: str):
+    return db.query(models.User).filter(models.User.email == email).first()
 
+def create_user(db: Session, user: schemas.UserCreate):
+    # У реальному дипломі тут має бути хешування: pwd_context.hash(user.password)
+    fake_hashed_password = user.password + "notreallyhashed"
+    db_user = models.User(email=user.email, hashed_password=fake_hashed_password)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+# --- Операції з Місцями ---
 def create_place(db: Session, place: schemas.PlaceCreate):
+    # Формуємо точку для PostGIS
+    point = f'POINT({place.longitude} {place.latitude})'
     db_place = models.Place(
         name=place.name,
         description=place.description,
         category=place.category,
         rating=place.rating,
-        # Завжди встановлюємо 4326 при створенні
-        location=func.ST_SetSRID(func.ST_MakePoint(place.longitude, place.latitude), 4326)
+        location=point
     )
     db.add(db_place)
     db.commit()
@@ -22,11 +33,3 @@ def create_place(db: Session, place: schemas.PlaceCreate):
 
 def get_places(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Place).offset(skip).limit(limit).all()
-
-def create_user(db: Session, user: schemas.UserCreate):
-    hashed_password = pwd_context.hash(user.password)
-    db_user = models.User(email=user.email, hashed_password=hashed_password)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user

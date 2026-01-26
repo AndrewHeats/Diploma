@@ -1,22 +1,24 @@
 from sqlalchemy.orm import Session
-from models import Place
-from geoalchemy2.functions import ST_DWithin, ST_MakePoint, ST_SetSRID
+from sqlalchemy import func
+import models
 
 
-def get_personalized_route(db: Session, lat: float, lon: float, preferences: list, duration_type: str = "medium",
-                           radius_km: int = 5):
-    # Налаштування радіуса та ліміту точок залежно від часу прогулянки
-    settings = {
-        "short": {"radius": 2500, "limit": 3},
-        "medium": {"radius": 5000, "limit": 7},
-        "long": {"radius": 10000, "limit": 12}
-    }
-    conf = settings.get(duration_type, settings["medium"])
+def suggest_locations(db: Session, lat: float, lon: float, prefs: list, limit: int):
+    """
+    Пошук пам'яток у радіусі 20 км з врахуванням категорій.
+    """
+    # Створюємо точку користувача у системі координат WGS84
+    user_point = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
 
-    # Використовуємо ST_SetSRID 4326 для уникнення помилок Mixed SRID
-    user_point = ST_SetSRID(ST_MakePoint(lon, lat), 4326)
+    query = db.query(models.Place)
 
-    return db.query(Place).filter(
-        ST_DWithin(Place.location, user_point, conf["radius"]),
-        Place.category.in_(preferences)
-    ).order_by(Place.rating.desc()).limit(conf["limit"]).all()
+    # Фільтр за вподобаннями, якщо вони вибрані
+    if prefs:
+        query = query.filter(models.Place.category.in_(prefs))
+
+    # Географічний фільтр (радіус 20000 метрів)
+    query = query.filter(
+        func.ST_DWithin(models.Place.location, user_point, 20000)
+    ).order_by(models.Place.rating.desc()).limit(limit)
+
+    return query.all()
