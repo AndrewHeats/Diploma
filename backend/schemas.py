@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Any
 from datetime import datetime
 
+# --- Користувачі ---
 class UserBase(BaseModel):
     email: EmailStr
 
@@ -10,8 +11,10 @@ class UserCreate(UserBase):
 
 class User(UserBase):
     id: int
-    class Config: from_attributes = True
+    class Config:
+        from_attributes = True
 
+# --- Місця ---
 class PlaceBase(BaseModel):
     name: str
     description: Optional[str] = None
@@ -26,8 +29,10 @@ class Place(PlaceBase):
     id: int
     latitude: float
     longitude: float
-    class Config: from_attributes = True
+    class Config:
+        from_attributes = True
 
+# --- Маршрути ---
 class RouteStep(BaseModel):
     from_name: str
     to_name: str
@@ -47,10 +52,13 @@ class RouteResponse(BaseModel):
     itinerary: List[RouteStep]
     total_duration_min: int
 
+# --- Історія ---
 class HistoryItem(BaseModel):
     id: int
-    route_name: str
-    total_duration: int
-    points_summary: str
-    created_at: datetime
-    class Config: from_attributes = True
+    route_name: Optional[str] = "Без назви"
+    total_duration: Optional[int] = 0
+    points_summary: Optional[str] = ""
+    created_at: Optional[datetime] = None
+    route_data: Optional[Any] = None
+    class Config:
+        from_attributes = True

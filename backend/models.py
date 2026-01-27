@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON
 from sqlalchemy.sql import func
 from geoalchemy2 import Geometry
 from database import Base
@@ -26,3 +26,5 @@ class SavedRoute(Base):
     total_duration = Column(Integer)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     points_summary = Column(String)
+    # Зберігаємо весь об'єкт маршруту для відтворення на мапі
+    route_data = Column(JSON)
