@@ -11,8 +11,7 @@ class UserCreate(UserBase):
 
 class User(UserBase):
     id: int
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 # --- Місця ---
 class PlaceBase(BaseModel):
@@ -29,8 +28,7 @@ class Place(PlaceBase):
     id: int
     latitude: float
     longitude: float
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 # --- Маршрути ---
 class RouteStep(BaseModel):
@@ -60,5 +58,8 @@ class HistoryItem(BaseModel):
     points_summary: Optional[str] = ""
     created_at: Optional[datetime] = None
     route_data: Optional[Any] = None
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
+
+# НОВЕ: Схема для оновлення назви
+class UpdateRouteName(BaseModel):
+    route_name: str = Field(..., min_length=1, max_length=100)
