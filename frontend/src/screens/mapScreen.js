@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../store/appContext';
 import { travelApi } from '../api/routeService';
@@ -16,29 +16,26 @@ export default function MapScreen({ navigation, route: navRoute }) {
     }
   }, [navRoute.params?.savedRoute]);
 
+  const openInGoogleMaps = (name) => {
+    const query = encodeURIComponent(`${name} Львів`);
+    const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    Linking.openURL(url);
+  };
+
   const buildRoute = async () => {
     const selected = Object.keys(preferences).filter(k => preferences[k]);
     setLoading(true);
-    
-    // ПЕРЕВІРКА В КОНСОЛІ ТЕЛЕФОНУ
-    console.log("Відправляємо запит. Юзер ID:", user?.id);
-
     try {
       const data = await travelApi.generateRoute({
         start_lat: userLocation.latitude,
         start_lon: userLocation.longitude,
         preferences: selected,
         duration_type: durationType,
-        user_id: user?.id  // ЦЕЙ ID МАЄ БУТИ ПРАВИЛЬНИМ
+        user_id: user?.id
       });
-
       setRoute(data);
-      navigation.navigate('Itinerary', { routeData: data });
-    } catch (e) {
-      Alert.alert("Помилка", "Не вдалося скласти маршрут.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -48,26 +45,42 @@ export default function MapScreen({ navigation, route: navRoute }) {
         style={styles.map}
         initialRegion={{ ...userLocation, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
       >
-        <Marker draggable coordinate={userLocation} onDragEnd={(e) => setUserLocation(e.nativeEvent.coordinate)} pinColor="black" title="Старт" />
+        <Marker 
+          draggable 
+          coordinate={userLocation} 
+          onDragEnd={(e) => setUserLocation(e.nativeEvent.coordinate)} 
+          pinColor="black" 
+        />
         
         {route?.points?.map(p => (
-          <Marker key={p.id} coordinate={{ latitude: p.latitude, longitude: p.longitude }} pinColor="#E91E63" title={p.name} />
+          <Marker key={p.id} coordinate={{ latitude: p.latitude, longitude: p.longitude }} pinColor="#E91E63">
+            <Callout onPress={() => openInGoogleMaps(p.name)}>
+              <View style={styles.callout}>
+                <Text style={styles.calloutTitle}>{p.name}</Text>
+                <Text style={styles.calloutLink}>Фото та відгуки ➔</Text>
+              </View>
+            </Callout>
+          </Marker>
         ))}
 
         {route?.geometry?.coordinates && (
           <Polyline 
-            key={Date.now().toString()} 
+            key={Date.now().toString()}
             coordinates={route.geometry.coordinates.map(c => ({ latitude: c[1], longitude: c[0] }))} 
-            strokeWidth={5} 
-            strokeColor="#2196F3" 
+            strokeWidth={5} strokeColor="#2196F3" 
           />
         )}
       </MapView>
 
       <View style={styles.durationBar}>
         {['short', 'medium', 'long'].map(t => (
-          <TouchableOpacity key={t} onPress={() => setDurationType(t)} style={[styles.tBtn, durationType === t && styles.active]}>
-            <Text style={{color: durationType === t ? '#fff' : '#333'}}>{t === 'short' ? '1 год' : t === 'medium' ? '1-3 год' : '3+ год'}</Text>
+          <TouchableOpacity 
+            key={t} onPress={() => setDurationType(t)} 
+            style={[styles.tBtn, durationType === t && styles.active]}
+          >
+            <Text style={{color: durationType === t ? '#fff' : '#333'}}>
+              {t === 'short' ? '1 год' : t === 'medium' ? '1-3 год' : '3+ год'}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -76,7 +89,6 @@ export default function MapScreen({ navigation, route: navRoute }) {
         <TouchableOpacity style={styles.mainBtn} onPress={buildRoute}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Скласти маршрут</Text>}
         </TouchableOpacity>
-        
         {route && (
           <TouchableOpacity style={styles.subBtn} onPress={() => navigation.navigate('Itinerary', { routeData: route })}>
             <Ionicons name="list" size={26} color="#fff" />
@@ -96,5 +108,7 @@ const styles = StyleSheet.create({
   btnRow: { position: 'absolute', bottom: 30, flexDirection: 'row', width: '90%', alignSelf: 'center', justifyContent: 'space-between' },
   mainBtn: { backgroundColor: '#2196F3', padding: 18, borderRadius: 30, flex: 1, alignItems: 'center', marginRight: 10 },
   subBtn: { backgroundColor: '#4CAF50', padding: 18, borderRadius: 30, width: 65, alignItems: 'center' },
-  btnText: { color: 'white', fontSize: 18, fontWeight: 'bold' }
+  btnText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+  callout: { padding: 5, minWidth: 120 },
+  calloutTitle: { fontWeight: 'bold', fontSize: 13 }
 });

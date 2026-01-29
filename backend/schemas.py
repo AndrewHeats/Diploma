@@ -11,9 +11,10 @@ class UserCreate(UserBase):
 
 class User(UserBase):
     id: int
-    class Config: from_attributes = True
+    class Config:
+        from_attributes = True
 
-# --- Місця ---
+# --- Місця (Place) ---
 class PlaceBase(BaseModel):
     name: str
     description: Optional[str] = None
@@ -21,6 +22,7 @@ class PlaceBase(BaseModel):
     rating: float = 0.0
 
 class PlaceCreate(PlaceBase):
+    """Цей клас виправляє вашу помилку AttributeError"""
     latitude: float
     longitude: float
 
@@ -28,9 +30,10 @@ class Place(PlaceBase):
     id: int
     latitude: float
     longitude: float
-    class Config: from_attributes = True
+    class Config:
+        from_attributes = True
 
-# --- Маршрути ---
+# --- Маршрути та Навігація ---
 class RouteStep(BaseModel):
     from_name: str
     to_name: str
@@ -50,7 +53,7 @@ class RouteResponse(BaseModel):
     itinerary: List[RouteStep]
     total_duration_min: int
 
-# --- Історія ---
+# --- Історія подорожей ---
 class HistoryItem(BaseModel):
     id: int
     route_name: Optional[str] = "Без назви"
@@ -58,8 +61,8 @@ class HistoryItem(BaseModel):
     points_summary: Optional[str] = ""
     created_at: Optional[datetime] = None
     route_data: Optional[Any] = None
-    class Config: from_attributes = True
+    class Config:
+        from_attributes = True
 
-# НОВЕ: Схема для оновлення назви
 class UpdateRouteName(BaseModel):
-    route_name: str = Field(..., min_length=1, max_length=100)
+    route_name: str

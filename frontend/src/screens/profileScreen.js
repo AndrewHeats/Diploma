@@ -16,12 +16,32 @@ export default function ProfileScreen({ navigation }) {
   const { user, setUser, preferences, setPreferences } = useContext(AppContext);
   const [stats, setStats] = useState({ count: 0, totalTime: 0 });
 
-  // КАТЕГОРІЇ ТОЧНО ЗА ТВОЇМ СКРИПТОМ
+  // КАТЕГОРІЇ З ПОЯСНЕННЯМИ (на основі твого скрипту мапування)
   const categories = [
-    { id: 'culture', label: 'Культура', icon: 'library-outline' }, // Музеї, пам'ятки
-    { id: 'food', label: 'Їжа та Бари', icon: 'restaurant-outline' }, // Кафе, ресторани, паби
-    { id: 'nature', label: 'Природа', icon: 'leaf-outline' }, // Парки
-    { id: 'other', label: 'Інше', icon: 'ellipsis-horizontal-outline' }, // Все інше
+    { 
+      id: 'culture', 
+      label: 'Культура', 
+      icon: 'library-outline', 
+      subtext: 'Музеї, пам’ятки, театри' 
+    },
+    { 
+      id: 'food', 
+      label: 'Їжа та дозвілля', 
+      icon: 'restaurant-outline', 
+      subtext: 'Кафе, бари та паби' 
+    },
+    { 
+      id: 'nature', 
+      label: 'Природа', 
+      icon: 'leaf-outline', 
+      subtext: 'Парки та сквери' 
+    },
+    { 
+      id: 'other', 
+      label: 'Інше', 
+      icon: 'ellipsis-horizontal-outline', 
+      subtext: 'Різні цікаві точки' 
+    },
   ];
 
   useEffect(() => {
@@ -32,7 +52,7 @@ export default function ProfileScreen({ navigation }) {
           const time = data.reduce((acc, item) => acc + (item.total_duration || 0), 0);
           setStats({ count: data.length, totalTime: time });
         } catch (e) {
-          console.error("Помилка завантаження статистики");
+          console.error("Статистика не завантажилась");
         }
       }
     };
@@ -57,7 +77,7 @@ export default function ProfileScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
         
-        {/* Хедер із аватаром та поштою */}
+        {/* Хедер із статистикою */}
         <View style={styles.header}>
           <Ionicons name="person-circle" size={90} color="#2196F3" />
           <Text style={styles.email}>{user?.email || 'Мій Профіль'}</Text>
@@ -75,41 +95,53 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
 
-        {/* СИНХРОНІЗОВАНІ ВПОДОБАННЯ */}
+        {/* СЕКЦІЯ ВПОДОБАНЬ З ПІДКАЗКАМИ */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Мої інтереси у Львові</Text>
-          <View style={styles.tagsContainer}>
+          <View style={styles.listContainer}>
             {categories.map((cat) => (
               <TouchableOpacity 
                 key={cat.id} 
                 onPress={() => togglePreference(cat.id)}
                 style={[
-                  styles.tag, 
-                  preferences[cat.id] && styles.tagActive
+                  styles.prefCard, 
+                  preferences[cat.id] && styles.prefCardActive
                 ]}
               >
+                <View style={styles.prefIconBox}>
+                  <Ionicons 
+                    name={cat.icon} 
+                    size={24} 
+                    color={preferences[cat.id] ? '#fff' : '#2196F3'} 
+                  />
+                </View>
+                <View style={styles.prefTextBox}>
+                  <Text style={[
+                    styles.prefLabel, 
+                    preferences[cat.id] && styles.textWhite
+                  ]}>
+                    {cat.label}
+                  </Text>
+                  <Text style={[
+                    styles.prefSubtext, 
+                    preferences[cat.id] && styles.textLightBlue
+                  ]}>
+                    {cat.subtext}
+                  </Text>
+                </View>
                 <Ionicons 
-                  name={cat.icon} 
-                  size={18} 
-                  color={preferences[cat.id] ? '#fff' : '#2196F3'} 
+                  name={preferences[cat.id] ? "checkbox" : "square-outline"} 
+                  size={20} 
+                  color={preferences[cat.id] ? '#fff' : '#ccc'} 
                 />
-                <Text style={[
-                  styles.tagText, 
-                  preferences[cat.id] && styles.tagTextActive
-                ]}>
-                  {cat.label}
-                </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Основне меню */}
+        {/* Меню налаштувань */}
         <View style={styles.menu}>
-          <TouchableOpacity 
-            style={styles.menuItem} 
-            onPress={() => navigation.navigate('Історія')}
-          >
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Історія')}>
             <View style={styles.menuLeft}>
               <Ionicons name="time-outline" size={22} color="#555" />
               <Text style={styles.menuText}>Історія подорожей</Text>
@@ -117,10 +149,7 @@ export default function ProfileScreen({ navigation }) {
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.menuItem, { borderBottomWidth: 0 }]} 
-            onPress={handleLogout}
-          >
+          <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
             <View style={styles.menuLeft}>
               <Ionicons name="log-out-outline" size={22} color="#FF5252" />
               <Text style={[styles.menuText, { color: '#FF5252' }]}>Вийти з акаунта</Text>
@@ -146,25 +175,27 @@ const styles = StyleSheet.create({
   
   section: { padding: 20 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 15 },
-  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap' },
-  tag: { 
+  listContainer: { width: '100%' },
+  prefCard: { 
     flexDirection: 'row', 
     alignItems: 'center', 
     backgroundColor: '#fff', 
-    paddingHorizontal: 15, 
-    paddingVertical: 12, 
-    borderRadius: 25, 
-    marginRight: 10, 
-    marginBottom: 12, 
-    elevation: 3,
+    padding: 15, 
+    borderRadius: 15, 
+    marginBottom: 10, 
+    elevation: 2,
     borderWidth: 1,
-    borderColor: '#e3f2fd'
+    borderColor: '#eee'
   },
-  tagActive: { backgroundColor: '#2196F3', borderColor: '#2196F3' },
-  tagText: { marginLeft: 10, color: '#2196F3', fontWeight: '600' },
-  tagTextActive: { color: '#fff' },
+  prefCardActive: { backgroundColor: '#2196F3', borderColor: '#2196F3' },
+  prefIconBox: { width: 40, alignItems: 'center' },
+  prefTextBox: { flex: 1, marginLeft: 15 },
+  prefLabel: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+  prefSubtext: { fontSize: 12, color: '#777', marginTop: 2 },
+  textWhite: { color: '#fff' },
+  textLightBlue: { color: '#e3f2fd' },
 
-  menu: { backgroundColor: '#fff', marginHorizontal: 20, borderRadius: 20, elevation: 2, paddingVertical: 5 },
+  menu: { backgroundColor: '#fff', marginHorizontal: 20, borderRadius: 20, elevation: 2 },
   menuItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#f8f8f8' },
   menuLeft: { flexDirection: 'row', alignItems: 'center' },
   menuText: { marginLeft: 15, fontSize: 15, color: '#444' }
