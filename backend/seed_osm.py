@@ -1,96 +1,135 @@
-import sys
-import os
 import requests
+import time
 from sqlalchemy import func
-# Додаємо імпорт engine для керування таблицями
 from database import SessionLocal, engine
 import models
 
 # --- НАЛАШТУВАННЯ ---
-CITY_NAME = "Львів"
-OVERPASS_URL = "http://overpass-api.de/api/interpreter"
+# Координати Львова: South, West, North, East (найстабільніша зона)
+BBOX = "49.76,23.88,49.93,24.13"
 
-# Запит до OSM (додано historic та бари)
-OSM_QUERY = f"""
-[out:json][timeout:60];
-area["name:uk"="{CITY_NAME}"]->.searchArea;
-(
-  node["tourism"~"museum|attraction"](area.searchArea);
-  node["historic"~"monument|memorial"](area.searchArea);
-  node["amenity"~"cafe|restaurant|bar|pub"](area.searchArea);
-  way["leisure"="park"](area.searchArea);
-);
-out center;
-"""
+# Список робочих дзеркал Overpass API для ротації (захист від блокувань)
+SERVERS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://lz4.overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter"
+]
 
-
-def map_category(tags):
-    """Мапування тегів OSM на категорії додатка"""
-    if "historic" in tags or "tourism" in tags: return "culture"
-    if "amenity" in tags: return "food"
-    if "leisure" in tags: return "nature"
-    return "other"
+# РОЗПОДІЛЕНІ ЗАПИТИ (захист від помилки 504 Timeout)
+QUERIES = {
+    "culture_arts": 'nwr["tourism"~"museum|gallery|arts_centre"]; nwr["amenity"="theatre"];',
+    "culture_religion": 'nwr["amenity"="place_of_worship"];',
+    "culture_history": 'nwr["historic"~"monument|memorial|statue|castle"]; nwr["tourism"~"viewpoint|attraction|artwork"];',
+    "food_rest": 'nwr["amenity"="restaurant"];',
+    "food_cafe": 'nwr["amenity"~"cafe|bar|pub|ice_cream"];',
+    "nature": 'nwr["leisure"~"park|garden"]; nwr["place"="square"];'
+}
 
 
-def seed_db():
-    # --- КРОК 1: ПЕРЕЗАВАНТАЖЕННЯ ТАБЛИЦЬ ---
-    print("🗑️ Очищення бази даних та перестворення таблиць...")
-    # Видаляємо всі існуючі таблиці, описані в models
-    models.Base.metadata.drop_all(bind=engine)
-    # Створюємо їх заново з чистого аркуша
-    models.Base.metadata.create_all(bind=engine)
-    print("✅ Таблиці перестворено.")
+def map_cuisine_tag(tags):
+    """Синхронізація з ProfileScreen: ukrainian, italian, jewish, regional, coffee_shop, burger"""
+    c = tags.get('cuisine', '').lower()
+    a = tags.get('amenity', '').lower()
+    if 'ukrainian' in c: return 'ukrainian'
+    if 'italian' in c or 'pizza' in c: return 'italian'
+    if 'jewish' in c: return 'jewish'
+    if any(x in c for x in ['regional', 'galician', 'local', 'austrian']): return 'regional'
+    if a == 'cafe' or 'coffee' in c: return 'coffee_shop'
+    if 'burger' in c or 'fast_food' in a: return 'burger'
+    return None
 
-    # --- КРОК 2: ОТРИМАННЯ ДАНИХ ---
-    print(f"📡 Запит до OpenStreetMap для міста {CITY_NAME}...")
+
+def fetch_data(query_filter, server_index=0):
+    """Функція для отримання даних з обробкою помилок та зміною серверів"""
+    query = f'[out:json][timeout:180][bbox:{BBOX}];({query_filter});out center;'
+    headers = {'User-Agent': 'LvivTouristApp_Diploma_v7'}
+
     try:
-        response = requests.post(OVERPASS_URL, data={'data': OSM_QUERY}, timeout=60)
-        elements = response.json().get('elements', [])
+        url = SERVERS[server_index]
+        print(f"📡 Запит до: {url.split('/')[2]}...")
+        resp = requests.post(url, data={'data': query}, headers=headers, timeout=200)
+
+        if resp.status_code == 429:
+            print("⚠️ Помилка 429 (Забагато запитів). Чекаємо 30с та міняємо дзеркало...")
+            time.sleep(30)
+            return fetch_data(query_filter, (server_index + 1) % len(SERVERS))
+
+        if resp.status_code == 200:
+            return resp.json().get('elements', [])
+
+        print(f"⚠️ Помилка {resp.status_code}. Пробуємо інше дзеркало...")
+        if server_index < len(SERVERS) - 1:
+            return fetch_data(query_filter, server_index + 1)
+
     except Exception as e:
-        print(f"❌ Помилка мережі: {e}")
-        return
+        print(f"❌ Помилка з'єднання: {e}")
+    return []
 
-    if not elements:
-        print("📭 Об'єктів не знайдено.")
-        return
 
-    # --- КРОК 3: ЗАПОВНЕННЯ БАЗИ ---
+def seed_db(full_reset=False):
+    """
+    Основна функція завантаження.
+    full_reset=True видалить всі старі дані.
+    full_reset=False (за замовчуванням) просто довантажить нові точки.
+    """
+    if full_reset:
+        print("🗑️ ПОВНЕ ОЧИЩЕННЯ БАЗИ ДАНИХ...")
+        models.Base.metadata.drop_all(bind=engine)
+
+    models.Base.metadata.create_all(bind=engine)
     db = SessionLocal()
-    print(f"📥 Знайдено {len(elements)} локацій. Починаємо імпорт...")
+    total_added = 0
 
-    try:
-        added_count = 0
+    print(f"🚀 Починаємо {'перестворення' if full_reset else 'довантаження'} локацій...")
+
+    for key, osm_filter in QUERIES.items():
+        # Визначаємо категорію для твого додатка
+        final_cat = "culture" if "culture" in key else ("food" if "food" in key else key)
+        print(f"\n🔍 Опрацювання підкатегорії: {key.upper()}")
+
+        elements = fetch_data(osm_filter)
+        if not elements:
+            print(f"📭 Не вдалося отримати дані для {key}.")
+            continue
+
+        added_this_round = 0
         for el in elements:
             tags = el.get('tags', {})
-            name = tags.get('name') or tags.get('name:uk') or tags.get('name:en')
+            name = tags.get('name:uk') or tags.get('name') or tags.get('name:en')
+            if not name: continue
 
-            # Визначаємо координати (враховуємо центри для парків)
+            # ЗАХИСТ ВІД ДУБЛІКАТІВ: Перевіряємо, чи є місце з такою назвою
+            exists = db.query(models.Place).filter(models.Place.name == name).first()
+            if exists: continue
+
             lon = el.get('lon') or el.get('center', {}).get('lon')
             lat = el.get('lat') or el.get('center', {}).get('lat')
 
-            if not (name and lon and lat):
-                continue
+            cuisine_id = map_cuisine_tag(tags)
+            # Формуємо опис з міткою для твого алгоритму маршрутів
+            description = f"Категорія: {final_cat}"
+            if cuisine_id:
+                description += f" | CUISINE_TAG:{cuisine_id}"
 
-            # Створюємо об'єкт місця з правильним SRID 4326
             place = models.Place(
                 name=name,
-                description=tags.get('description', f"Категорія: {map_category(tags)}"),
-                category=map_category(tags),
-                rating=4.5,  # Базовий рейтинг
+                description=description,
+                category=final_cat,
+                rating=4.5,
                 location=func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
             )
             db.add(place)
-            added_count += 1
+            added_this_round += 1
+            total_added += 1
 
         db.commit()
-        print(f"🚀 Успішно додано {added_count} нових точок!")
+        print(f"✅ Додано нових об'єктів: {added_this_round}")
+        time.sleep(5)  # Пауза для стабільності
 
-    except Exception as e:
-        print(f"❌ Помилка запису: {e}")
-        db.rollback()
-    finally:
-        db.close()
+    db.close()
+    print(f"\n🏁 ФІНІШ! Всього додано {total_added} нових точок.")
 
 
 if __name__ == "__main__":
-    seed_db()
+    # Якщо хочеш стерти все і почати з нуля - постав True
+    seed_db(full_reset=False)

@@ -9,10 +9,12 @@ from services import algorithm, routing
 
 app = FastAPI(title="Travel App API")
 
-# Автоматичне створення таблиць при старті
+# Автоматичне створення таблиць у PostgreSQL
 models.Base.metadata.create_all(bind=database.engine)
 
-# Реєстрація користувача
+
+# --- 1. АВТОРТИЗАЦІЯ ТА КОРИСТУВАЧІ ---
+
 @app.post("/users/", response_model=schemas.User)
 def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
@@ -20,13 +22,34 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         raise HTTPException(status_code=400, detail="Цей Email вже зареєстровано")
     return crud.create_user(db=db, user=user)
 
-# Генерація нового маршруту
+
+# НОВЕ: Функція логіну (втрачена раніше)
+@app.post("/login/", response_model=schemas.User)
+def login_user(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
+    db_user = crud.get_user_by_email(db, email=user.email)
+    # Перевірка пароля (використовуємо ту ж логіку "фейкового" хешу, що і в crud)
+    if not db_user or db_user.hashed_password != user.password + "notreallyhashed":
+        raise HTTPException(status_code=400, detail="Невірний email або пароль")
+    return db_user
+
+
+# --- 2. ГЕНЕРАЦІЯ МАРШРУТУ ---
+
 @app.post("/generate-route/", response_model=schemas.RouteResponse)
 async def generate_route(req: schemas.RouteRequest, db: Session = Depends(database.get_db)):
     limit_map = {"short": 3, "medium": 5, "long": 9}
     point_limit = limit_map.get(req.duration_type, 5)
 
-    suggested = algorithm.suggest_locations(db, req.start_lat, req.start_lon, req.preferences, point_limit)
+    # ВИПРАВЛЕНО: Додано req.cuisine_prefs, щоб працював новий алгоритм
+    suggested = algorithm.suggest_locations(
+        db,
+        req.start_lat,
+        req.start_lon,
+        req.preferences,
+        req.cuisine_prefs,
+        point_limit
+    )
+
     if not suggested:
         raise HTTPException(status_code=404, detail="Місць не знайдено")
 
@@ -51,7 +74,7 @@ async def generate_route(req: schemas.RouteRequest, db: Session = Depends(databa
     for i, leg in enumerate(nav_data['legs']):
         itinerary.append(schemas.RouteStep(
             from_name=names[i],
-            to_name=names[i+1],
+            to_name=names[i + 1],
             duration_min=round(leg['duration'] / 60),
             distance_m=round(leg['distance'])
         ))
@@ -80,12 +103,15 @@ async def generate_route(req: schemas.RouteRequest, db: Session = Depends(databa
 
     return final_result
 
-# Отримання історії
+
+# --- 3. ІСТОРІЯ ТА КЕРУВАННЯ ---
+
 @app.get("/history/{user_id}", response_model=List[schemas.HistoryItem])
 def get_history(user_id: int, db: Session = Depends(database.get_db)):
-    return db.query(models.SavedRoute).filter(models.SavedRoute.user_id == user_id).order_by(models.SavedRoute.created_at.desc()).all()
+    return db.query(models.SavedRoute).filter(models.SavedRoute.user_id == user_id).order_by(
+        models.SavedRoute.created_at.desc()).all()
 
-# Видалення з історії
+
 @app.delete("/history/{route_id}")
 def delete_route(route_id: int, db: Session = Depends(database.get_db)):
     db_route = db.query(models.SavedRoute).filter(models.SavedRoute.id == route_id).first()
@@ -95,7 +121,7 @@ def delete_route(route_id: int, db: Session = Depends(database.get_db)):
     db.commit()
     return {"message": "Видалено"}
 
-# Редагування назви
+
 @app.patch("/history/{route_id}", response_model=schemas.HistoryItem)
 def update_name(route_id: int, data: schemas.UpdateRouteName, db: Session = Depends(database.get_db)):
     db_route = db.query(models.SavedRoute).filter(models.SavedRoute.id == route_id).first()
