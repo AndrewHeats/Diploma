@@ -15,25 +15,23 @@ import { Ionicons } from '@expo/vector-icons';
 export default function ItineraryScreen({ route, navigation }) {
   const { routeData } = route.params;
 
-  // Функція для відкриття профілю закладу в Google Maps
   const openInGoogleMaps = (name) => {
-    const query = encodeURIComponent(`${name} Львів`);
-    const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    if (!name) return;
+    const query = encodeURIComponent(`${name}, Львів`);
     
-    Linking.canOpenURL(url).then(supported => {
-      if (supported) {
-        Linking.openURL(url);
-      } else {
-        Linking.openURL(`https://www.google.com/maps/search/${query}`);
-      }
-    }).catch(() => {
+    // Пряме посилання для Google Maps (більш стабільне)
+    const googleUrl = `https://www.google.com/maps/search/?api=1&query={query}`;
+    const appleUrl = `http://maps.apple.com/?q=${query}`;
+
+    const url = Platform.OS === 'ios' ? appleUrl : googleUrl;
+
+    Linking.openURL(url).catch(() => {
       Alert.alert("Помилка", "Не вдалося відкрити карти.");
     });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* ХЕДЕР З ЗАГАЛЬНИМ ЧАСОМ МАРШРУТУ */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#333" />
@@ -52,7 +50,6 @@ export default function ItineraryScreen({ route, navigation }) {
         contentContainerStyle={{ padding: 20 }}
         renderItem={({ item, index }) => (
           <View style={styles.stepContainer}>
-            {/* Лінія та крапка зліва */}
             <View style={styles.timeline}>
               <View style={styles.dot} />
               {index < routeData.itinerary.length - 1 && <View style={styles.line} />}
@@ -63,23 +60,31 @@ export default function ItineraryScreen({ route, navigation }) {
               onPress={() => openInGoogleMaps(item.to_name)}
             >
               <View style={styles.cardHeader}>
-                <Text style={styles.locationName}>{item.from_name} ➔ {item.to_name}</Text>
+                <Text style={styles.locationName}>{item.to_name}</Text>
                 <Ionicons name="map-outline" size={18} color="#2196F3" />
               </View>
 
-              {/* ЧАС МІЖ ТОЧКАМИ (ДЕТАЛІ) */}
               <View style={styles.timeInfo}>
                 <View style={styles.infoBadge}>
-                  <Ionicons name="walk" size={16} color="#2196F3" />
+                  <Ionicons name="walk" size={14} color="#2196F3" />
                   <Text style={styles.infoText}>{item.duration_min} хв йти</Text>
                 </View>
-                <View style={[styles.infoBadge, { marginLeft: 10 }]}>
-                  <Ionicons name="navigate-outline" size={16} color="#666" />
-                  <Text style={styles.infoText}>{item.distance_m} м</Text>
+
+                {/* БЛОК ЧАСУ ПЕРЕБУВАННЯ */}
+                <View style={[styles.infoBadge, { backgroundColor: '#E8F5E9', marginLeft: 8 }]}>
+                  <Ionicons name="time-outline" size={14} color="#4CAF50" />
+                  <Text style={[styles.infoText, { color: '#2E7D32' }]}>
+                    + {item.stay_min || 0} хв там
+                  </Text>
+                </View>
+
+                <View style={[styles.infoBadge, { backgroundColor: '#F5F5F5', marginLeft: 8 }]}>
+                  <Text style={[styles.infoText, { color: '#666' }]}>{item.distance_m} м</Text>
                 </View>
               </View>
               
-              <Text style={styles.tapHint}>Натисніть для фото та відгуків у Картах</Text>
+              <Text style={styles.fromText}>Від: {item.from_name}</Text>
+              <Text style={styles.tapHint}>Натисніть для відгуків та фото ➔</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -97,42 +102,39 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    elevation: 3
+    elevation: 2
   },
   backBtn: { marginRight: 15 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
   headerSubtitle: { fontSize: 14, color: '#666', marginTop: 2 },
   blueText: { color: '#2196F3', fontWeight: 'bold' },
-  
-  stepContainer: { flexDirection: 'row', minHeight: 120 },
+  stepContainer: { flexDirection: 'row', minHeight: 110 },
   timeline: { alignItems: 'center', width: 20, marginRight: 15 },
-  dot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#2196F3', zIndex: 1, marginTop: 5 },
-  line: { width: 2, flex: 1, backgroundColor: '#2196F3', marginTop: -5, marginBottom: -5 },
-  
+  dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#2196F3', zIndex: 1, marginTop: 8 },
+  line: { width: 2, flex: 1, backgroundColor: '#2196F3', marginTop: -2, marginBottom: -2 },
   card: { 
     flex: 1, 
     backgroundColor: '#fff', 
     borderRadius: 15, 
     padding: 15, 
-    marginBottom: 20,
-    elevation: 2,
+    marginBottom: 15,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 5
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  locationName: { fontSize: 15, fontWeight: 'bold', color: '#333', flex: 1, marginRight: 10 },
-  
-  timeInfo: { flexDirection: 'row', alignItems: 'center', marginVertical: 5 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  locationName: { fontSize: 16, fontWeight: 'bold', color: '#333', flex: 1 },
+  timeInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   infoBadge: { 
     flexDirection: 'row', 
     alignItems: 'center', 
     backgroundColor: '#E3F2FD', 
-    paddingHorizontal: 10, 
-    paddingVertical: 5, 
-    borderRadius: 8 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    borderRadius: 6 
   },
-  infoText: { fontSize: 13, color: '#333', marginLeft: 5, fontWeight: '500' },
-  
-  tapHint: { fontSize: 11, color: '#2196F3', marginTop: 10, fontStyle: 'italic' }
+  infoText: { fontSize: 12, color: '#2196F3', marginLeft: 4, fontWeight: '600' },
+  fromText: { fontSize: 12, color: '#999' },
+  tapHint: { fontSize: 11, color: '#2196F3', marginTop: 10, fontStyle: 'italic', textAlign: 'right' }
 });

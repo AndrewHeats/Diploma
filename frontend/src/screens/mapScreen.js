@@ -1,12 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  ActivityIndicator, 
-  Linking, 
-  Alert 
+  StyleSheet, View, Text, TouchableOpacity, 
+  ActivityIndicator, Linking, Alert, Platform 
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Callout } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,42 +10,27 @@ import { travelApi } from '../api/routeService';
 
 export default function MapScreen({ navigation, route: navRoute }) {
   const { 
-    preferences, 
-    cuisinePreferences, 
-    userLocation, 
-    setUserLocation, 
-    durationType, 
-    setDurationType, 
-    user 
+    preferences, cuisinePreferences, userLocation, 
+    setUserLocation, durationType, setDurationType, user 
   } = useContext(AppContext);
   
   const [route, setRoute] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // Відслідковуємо, чи прийшов збережений маршрут з історії
   useEffect(() => {
     if (navRoute.params?.savedRoute) {
       setRoute(navRoute.params.savedRoute);
     }
   }, [navRoute.params?.savedRoute]);
 
-  // ВИПРАВЛЕНО: Функція для відкриття Google Maps без "пшиків"
   const openInGoogleMaps = (name) => {
+    if (!name) return;
     const query = encodeURIComponent(`${name}, Львів`);
-    // Використовуємо універсальний URL для пошуку місця
-    const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
-
-    Linking.canOpenURL(url).then((supported) => {
-      if (supported) {
-        Linking.openURL(url);
-      } else {
-        Alert.alert("Помилка", "Не вдалося відкрити додаток карт");
-      }
-    }).catch(err => console.error("Помилка при відкритті карт:", err));
+    const url = Platform.OS === 'ios' ? `http://maps.apple.com/?q=${query}` : `https://www.google.com/maps/search/?api=1&query=${query}`;
+    Linking.openURL(url).catch(() => Alert.alert("Помилка", "Не вдалося відкрити карти"));
   };
 
   const buildRoute = async () => {
-    // Збираємо активні категорії та кухні
     const selectedPrefs = Object.keys(preferences).filter(k => preferences[k]);
     const selectedCuisines = Object.keys(cuisinePreferences).filter(k => cuisinePreferences[k]);
 
@@ -64,10 +44,10 @@ export default function MapScreen({ navigation, route: navRoute }) {
         duration_type: durationType,
         user_id: user?.id
       });
+      if (!data) throw new Error("Порожні дані від сервера");
       setRoute(data);
     } catch (e) {
-      console.error("Помилка при генерації маршруту:", e.response?.data || e.message);
-      Alert.alert("Помилка", "Не вдалося скласти маршрут. Спробуйте змінити налаштування.");
+      Alert.alert("Помилка", "Не вдалося скласти маршрут. Спробуйте іншу локацію.");
     } finally {
       setLoading(false);
     }
@@ -85,49 +65,54 @@ export default function MapScreen({ navigation, route: navRoute }) {
           longitudeDelta: 0.05,
         }}
       >
-        {/* Маркер користувача (можна перетягувати) */}
         <Marker 
           draggable 
-          coordinate={userLocation} 
+          coordinate={{
+            latitude: parseFloat(userLocation.latitude),
+            longitude: parseFloat(userLocation.longitude)
+          }} 
           onDragEnd={(e) => setUserLocation(e.nativeEvent.coordinate)} 
           pinColor="black" 
-          title="Ваше місцезнаходження"
         />
         
-        {/* Точки маршруту */}
-        {route?.points?.map(p => (
-          <Marker 
-            key={p.id} 
-            coordinate={{ latitude: p.latitude, longitude: p.longitude }} 
-            pinColor="#E91E63"
-          >
-            <Callout onPress={() => openInGoogleMaps(p.name)}>
-              <View style={styles.callout}>
-                <Text style={styles.calloutTitle}>{p.name}</Text>
-                <Text style={styles.calloutSub}>Категорія: {p.category}</Text>
-                <View style={styles.infoRow}>
-                   <Text style={styles.calloutLink}>Інфо та фото ➔</Text>
-                </View>
-              </View>
-            </Callout>
-          </Marker>
-        ))}
+        {/* БЕЗПЕЧНИЙ РЕНДЕР МАРКЕРІВ */}
+        {route?.points && route.points.map((p, index) => {
+          const lat = parseFloat(p.latitude);
+          const lon = parseFloat(p.longitude);
+          if (isNaN(lat) || isNaN(lon)) return null;
 
-        {/* Лінія маршруту по дорогах */}
-        {route?.geometry?.coordinates && (
+          return (
+            <Marker 
+              key={`m-${p.id || index}-${route.total_duration_min}`} 
+              coordinate={{ latitude: lat, longitude: lon }} 
+              pinColor="#E91E63"
+              tracksViewChanges={false}
+            >
+              <Callout onPress={() => openInGoogleMaps(p.name)}>
+                <View style={styles.callout}>
+                  <Text style={styles.calloutTitle}>{String(p.name || "Місце")}</Text>
+                  <Text style={styles.calloutSub}>{p.category || "Пам'ятка"}</Text>
+                  <Text style={styles.calloutLink}>Відкрити карти ➔</Text>
+                </View>
+              </Callout>
+            </Marker>
+          );
+        })}
+
+        {/* БЕЗПЕЧНИЙ РЕНДЕР ПОЛІЛІНІЇ */}
+        {route?.geometry?.coordinates?.length > 0 && (
           <Polyline 
-            key={`route-line-${route.geometry.coordinates.length}`}
+            key={`poly-${route.geometry.coordinates.length}`}
             coordinates={route.geometry.coordinates.map(c => ({ 
-              latitude: c[1], 
-              longitude: c[0] 
+              latitude: parseFloat(c[1]), 
+              longitude: parseFloat(c[0]) 
             }))} 
-            strokeWidth={5} 
+            strokeWidth={4} 
             strokeColor="#2196F3" 
           />
         )}
       </MapView>
 
-      {/* Перемикач тривалості */}
       <View style={styles.durationBar}>
         {['short', 'medium', 'long'].map(t => (
           <TouchableOpacity 
@@ -142,16 +127,10 @@ export default function MapScreen({ navigation, route: navRoute }) {
         ))}
       </View>
 
-      {/* Кнопки керування */}
       <View style={styles.btnRow}>
         <TouchableOpacity style={styles.mainBtn} onPress={buildRoute}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.btnText}>Скласти маршрут</Text>
-          )}
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Скласти маршрут</Text>}
         </TouchableOpacity>
-        
         {route && (
           <TouchableOpacity 
             style={styles.subBtn} 
@@ -169,51 +148,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
   durationBar: { 
-    position: 'absolute', 
-    top: 50, 
-    flexDirection: 'row', 
-    alignSelf: 'center', 
-    backgroundColor: 'white', 
-    borderRadius: 25, 
-    padding: 5, 
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    position: 'absolute', top: 60, flexDirection: 'row', alignSelf: 'center', 
+    backgroundColor: 'white', borderRadius: 25, padding: 5, elevation: 5,
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4,
   },
   tBtn: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 20 },
   active: { backgroundColor: '#2196F3' },
-  btnRow: { 
-    position: 'absolute', 
-    bottom: 30, 
-    flexDirection: 'row', 
-    width: '90%', 
-    alignSelf: 'center', 
-    justifyContent: 'space-between' 
-  },
-  mainBtn: { 
-    backgroundColor: '#2196F3', 
-    padding: 18, 
-    borderRadius: 30, 
-    flex: 1, 
-    alignSelf: 'center',
-    alignItems: 'center', 
-    marginRight: 10, 
-    elevation: 5 
-  },
-  subBtn: { 
-    backgroundColor: '#4CAF50', 
-    padding: 18, 
-    borderRadius: 30, 
-    width: 65, 
-    alignItems: 'center', 
-    elevation: 5 
-  },
+  btnRow: { position: 'absolute', bottom: 40, flexDirection: 'row', width: '90%', alignSelf: 'center', justifyContent: 'space-between' },
+  mainBtn: { backgroundColor: '#2196F3', padding: 18, borderRadius: 30, flex: 1, alignItems: 'center', marginRight: 10 },
+  subBtn: { backgroundColor: '#4CAF50', padding: 18, borderRadius: 30, width: 65, alignItems: 'center' },
   btnText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
-  callout: { padding: 8, minWidth: 150 },
-  calloutTitle: { fontWeight: 'bold', fontSize: 14, color: '#333' },
-  calloutSub: { fontSize: 12, color: '#666', marginBottom: 5 },
-  infoRow: { borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 5, marginTop: 5 },
-  calloutLink: { color: '#2196F3', fontWeight: 'bold', fontSize: 12, textAlign: 'center' }
+  callout: { padding: 10, minWidth: 150, alignItems: 'center' },
+  calloutTitle: { fontWeight: '700', fontSize: 14, textAlign: 'center' },
+  calloutSub: { fontSize: 12, color: '#8E8E93', marginVertical: 4 },
+  calloutLink: { color: '#007AFF', fontWeight: '600', fontSize: 12 }
 });
