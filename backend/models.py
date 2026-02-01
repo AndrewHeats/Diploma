@@ -28,3 +28,9 @@ class SavedRoute(Base):
     points_summary = Column(String)
     # Зберігаємо весь об'єкт маршруту для відтворення на мапі
     route_data = Column(JSON)
+
+class UserBlacklist(Base):
+    __tablename__ = "user_blacklist"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    place_id = Column(Integer, ForeignKey("places.id"))

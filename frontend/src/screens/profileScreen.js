@@ -13,7 +13,6 @@ import { AppContext } from '../store/appContext';
 import { travelApi } from '../api/routeService';
 
 export default function ProfileScreen({ navigation }) {
-  // Додаємо cuisinePreferences з контексту
   const { 
     user, 
     setUser, 
@@ -25,7 +24,7 @@ export default function ProfileScreen({ navigation }) {
 
   const [stats, setStats] = useState({ count: 0, totalTime: 0 });
 
-  // Основні категорії за твоїм скриптом seed_db.py
+  // Основні категорії за скриптом seed_db.py
   const categories = [
     { id: 'culture', label: 'Культура', icon: 'library-outline', subtext: 'Музеї, храми, театри' },
     { id: 'food', label: 'Харчування', icon: 'restaurant-outline', subtext: 'Сніданки, обіди, вечері' },
@@ -33,10 +32,13 @@ export default function ProfileScreen({ navigation }) {
     { id: 'other', label: 'Інше', icon: 'ellipsis-horizontal-outline', subtext: 'Цікавинки Львова' },
   ];
 
-  // СПИСОК КУХОНЬ ДЛЯ НОВОГО АЛГОРИТМУ
+  // СПИСОК КУХОНЬ
   const cuisineTypes = [
     { id: 'ukrainian', label: 'Українська' },
     { id: 'italian', label: 'Італійська' },
+    { id: 'asian', label: 'Азійська' },
+    { id: 'georgian', label: 'Грузинська' },
+    { id: 'greek', label: 'Грецька' },
     { id: 'jewish', label: 'Єврейська' },
     { id: 'regional', label: 'Галицька' },
     { id: 'coffee_shop', label: 'Кав’ярні' },
@@ -60,7 +62,6 @@ export default function ProfileScreen({ navigation }) {
     setPreferences({ ...preferences, [id]: !preferences[id] });
   };
 
-  // НОВА ФУНКЦІЯ: Перемикання кухонь
   const toggleCuisine = (id) => {
     setCuisinePreferences({
       ...cuisinePreferences,
@@ -97,7 +98,7 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
 
-        {/* СЕКЦІЯ 1: ОСНОВНІ ІНТЕРЕСИ */}
+        {/* СЕКЦІЯ 1: ТИП МАРШРУТУ */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Тип маршруту</Text>
           <View style={styles.listContainer}>
@@ -119,7 +120,7 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
 
-        {/* СЕКЦІЯ 2: УЛЮБЛЕНА КУХНЯ (Нове!) */}
+        {/* СЕКЦІЯ 2: УЛЮБЛЕНА КУХНЯ */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Улюблена кухня</Text>
           <View style={styles.cuisineContainer}>
@@ -139,6 +140,7 @@ export default function ProfileScreen({ navigation }) {
 
         {/* МЕНЮ */}
         <View style={styles.menu}>
+          {/* Перехід до історії */}
           <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Історія')}>
             <View style={styles.menuLeft}>
               <Ionicons name="time-outline" size={22} color="#555" />
@@ -147,6 +149,16 @@ export default function ProfileScreen({ navigation }) {
             <Ionicons name="chevron-forward" size={20} color="#ccc" />
           </TouchableOpacity>
 
+          {/* НОВО: Перехід до чорного списку */}
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Blacklist')}>
+            <View style={styles.menuLeft}>
+              <Ionicons name="ban-outline" size={22} color="#555" />
+              <Text style={styles.menuText}>Чорний список</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          </TouchableOpacity>
+
+          {/* Вихід */}
           <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
             <View style={styles.menuLeft}>
               <Ionicons name="log-out-outline" size={22} color="#FF5252" />
@@ -183,7 +195,6 @@ const styles = StyleSheet.create({
   textWhite: { color: '#fff' },
   textLightBlue: { color: '#e3f2fd' },
 
-  // Стилі для кухонь
   cuisineContainer: { flexDirection: 'row', flexWrap: 'wrap' },
   cuisineTag: { backgroundColor: '#fff', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginRight: 8, marginBottom: 8, elevation: 1, borderWidth: 1, borderColor: '#eee' },
   cuisineTagActive: { backgroundColor: '#4CAF50', borderColor: '#4CAF50' },

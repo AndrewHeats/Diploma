@@ -1,73 +1,57 @@
+import random
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
-
+from geoalchemy2 import Geography
 import models
 
 
-def suggest_locations(db: Session, lat: float, lon: float, prefs: list, cuisines: list, limit: int):
+def suggest_locations(db: Session, lat: float, lon: float, prefs: list, cuisines: list, limit: int,
+                      user_id: int = None):
     user_point = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
-    radius = 6000  # 6 км
 
-    # --- КРОК 1: ВИЗНАЧАЄМО ПРОПОРЦІЮ ---
+    # Фільтр чорного списку користувача
+    blacklisted_ids = []
+    if user_id:
+        blacklisted_ids = [r.place_id for r in
+                           db.query(models.UserBlacklist).filter(models.UserBlacklist.user_id == user_id).all()]
+
+    # Налаштування ритму та радіусу
     if limit <= 3:
-        food_count = 1
-        attr_count = 2
+        search_radius, pattern = 1200, ['attr', 'attr', 'food']
     elif limit <= 5:
-        food_count = 2
-        attr_count = 3
+        search_radius, pattern = 2500, ['attr', 'food', 'attr', 'attr', 'food']
     else:
-        food_count = 3
-        attr_count = limit - 3
+        search_radius, pattern = 5000, ['food', 'attr', 'attr', 'food', 'attr', 'attr', 'food']
 
-    # --- КРОК 2: ШУКАЄМО ЇЖУ ---
-    food_query = db.query(models.Place).filter(
-        models.Place.category == 'food',
-        func.ST_DWithin(models.Place.location, user_point, radius)
-    )
+    def get_pool(categories, is_food=False):
+        query = db.query(models.Place).filter(
+            models.Place.category.in_(categories),
+            ~models.Place.id.in_(blacklisted_ids) if blacklisted_ids else True,
+            func.ST_DWithin(func.cast(models.Place.location, Geography), func.cast(user_point, Geography),
+                            search_radius)
+        )
+        if is_food and cuisines:
+            cuisine_filters = [models.Place.description.contains(f"CUISINE_TAG:{c}") for c in cuisines]
+            res = query.filter(or_(*cuisine_filters)).all()
+            if res: return res
+        return query.order_by(func.ST_Distance(models.Place.location, user_point)).limit(50).all()
 
-    if cuisines:
-        # Фільтр по конкретних кухнях через теги, які ми додали в сідері
-        cuisine_filters = [models.Place.description.contains(f"CUISINE_TAG:{c}") for c in cuisines]
-        food_query = food_query.filter(or_(*cuisine_filters))
+    food_pool = get_pool(['food'], is_food=True)
+    attr_pool = get_pool([p for p in prefs if p != 'food'] or ['culture', 'nature'])
 
-    # Беремо їжу випадковим чином серед найкращих
-    restaurants = food_query.order_by(func.random()).limit(food_count).all()
+    ordered_itinerary, current_pos = [], user_point
 
-    # --- КРОК 3: ШУКАЄМО ПАМ'ЯТКИ (Культура, Природа) ---
-    # Виключаємо категорію food, щоб не було дублів
-    active_prefs = [p for p in prefs if p != 'food']
-    if not active_prefs:
-        active_prefs = ['culture', 'nature']  # фолбек, якщо нічого не обрано
+    for step_type in pattern:
+        target_pool = food_pool if step_type == 'food' else attr_pool
+        if not target_pool: target_pool = attr_pool if step_type == 'food' else food_pool
 
-    attractions = db.query(models.Place).filter(
-        models.Place.category.in_(active_prefs),
-        func.ST_DWithin(models.Place.location, user_point, radius)
-    ).order_by(func.random()).limit(attr_count).all()
+        if target_pool:
+            target_pool.sort(key=lambda p: db.scalar(func.ST_Distance(p.location, current_pos)))
+            # Рандомізація: беремо одного з 5 найближчих
+            lucky_idx = random.randint(0, min(len(target_pool), 5) - 1)
+            next_point = target_pool.pop(lucky_idx)
+            ordered_itinerary.append(next_point)
+            current_pos = next_point.location
+        if len(ordered_itinerary) >= limit: break
 
-    # --- КРОК 4: ПЕРЕМІШУЄМО В ЛОГІЧНИЙ МАРШРУТ ---
-    itinerary = []
-
-    if limit <= 3:
-        # План: Пам'ятка -> Їжа -> Пам'ятка
-        if len(attractions) > 0: itinerary.append(attractions[0])
-        if len(restaurants) > 0: itinerary.append(restaurants[0])
-        if len(attractions) > 1: itinerary.append(attractions[1])
-    else:
-        # План для довших маршрутів: почергово
-        # Сніданок (Food 1) -> Прогулянка (Attr 1, 2) -> Обід (Food 2) -> ...
-        attr_idx = 0
-        food_idx = 0
-
-        while len(itinerary) < (len(restaurants) + len(attractions)):
-            # Додаємо їжу кожні дві-три точки
-            if food_idx < len(restaurants):
-                itinerary.append(restaurants[food_idx])
-                food_idx += 1
-
-            # Додаємо пару пам'яток після їжі
-            for _ in range(2):
-                if attr_idx < len(attractions):
-                    itinerary.append(attractions[attr_idx])
-                    attr_idx += 1
-
-    return itinerary
+    return ordered_itinerary

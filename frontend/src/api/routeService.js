@@ -1,27 +1,33 @@
 import apiClient from './apiClient';
 
 export const travelApi = {
-  // Реєстрація користувача (йде на /users/)
+  // --- АВТОРИЗАЦІЯ ---
   registerUser: (userData) => 
     apiClient.post('/users/', userData).then(r => r.data),
 
-  // НОВЕ: Вхід користувача (йде на /login/)
   loginUser: (userData) => 
     apiClient.post('/login/', userData).then(r => r.data),
 
-  // Генерація маршруту
+  // --- МАРШРУТИ ---
   generateRoute: (params) => 
     apiClient.post('/generate-route/', params).then(r => r.data),
 
-  // Отримання історії
   getHistory: (userId) => 
     apiClient.get(`/history/${userId}`).then(r => r.data),
 
-  // Видалення маршруту
   deleteRoute: (routeId) => 
     apiClient.delete(`/history/${routeId}`).then(r => r.data),
 
-  // Оновлення назви
   updateRouteName: (routeId, newName) => 
-    apiClient.patch(`/history/${routeId}`, { route_name: newName }).then(r => r.data)
+    apiClient.patch(`/history/${routeId}`, { route_name: newName }).then(r => r.data),
+
+  // --- ЧОРНИЙ СПИСОК (Оновлено для роботи через apiClient) ---
+  getBlacklist: (userId) => 
+    apiClient.get(`/blacklist/${userId}`).then(r => r.data),
+
+  addToBlacklist: (userId, placeId) => 
+    apiClient.post('/blacklist/add', { user_id: userId, place_id: placeId }).then(r => r.data),
+
+  removeFromBlacklist: (userId, placeId) => 
+    apiClient.delete('/blacklist/remove', { data: { user_id: userId, place_id: placeId } }).then(r => r.data)
 };
