@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { 
   StyleSheet, View, Text, TouchableOpacity, 
-  ActivityIndicator, Linking, Alert, Platform, Dimensions
+  ActivityIndicator, Linking, Alert, Platform, Dimensions 
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,14 +10,15 @@ import { travelApi } from '../api/routeService';
 
 export default function MapScreen({ navigation, route: navRoute }) {
   const { 
-    preferences, cuisinePreferences, userLocation, 
-    setUserLocation, durationType, setDurationType, user 
+    preferences, cuisinePreferences, userLocation, setUserLocation, 
+    durationType, setDurationType, user, currentCity, changeCity, cityConfigs 
   } = useContext(AppContext);
   
   const [route, setRoute] = useState(null);
   const [loading, setLoading] = useState(false);
   const [selectedPoint, setSelectedPoint] = useState(null);
 
+  // Слідкуємо за переданим маршрутом з Історії
   useEffect(() => {
     if (navRoute.params?.savedRoute) {
       setRoute(navRoute.params.savedRoute);
@@ -26,30 +27,21 @@ export default function MapScreen({ navigation, route: navRoute }) {
   }, [navRoute.params?.savedRoute]);
 
   const openPlaceProfile = (name) => {
-    if (!name) return;
-    const url = `https://www.google.com/search?q=${encodeURIComponent(name + ' Львів')}`;
+    const url = `https://www.google.com/search?q=${encodeURIComponent(name + ' ' + cityConfigs[currentCity].name)}`;
     Linking.openURL(url).catch(() => Alert.alert("Помилка", "Не вдалося відкрити браузер"));
   };
 
   const handleAddToBlacklist = (point) => {
-    Alert.alert(
-      "Заблокувати?",
-      `Ви впевнені, що хочете додати "${point.name}" у чорний список?`,
-      [
-        { text: "Скасувати", style: "cancel" },
-        { 
-          text: "В бан", 
-          style: "destructive", 
-          onPress: async () => {
-            try {
-              await travelApi.addToBlacklist(user.id, point.id);
-              setSelectedPoint(null);
-              Alert.alert("Успіх", "Заклад заблоковано.");
-            } catch (e) { Alert.alert("Помилка", "Не вдалося заблокувати."); }
-          } 
-        }
-      ]
-    );
+    Alert.alert("Блокування", `Додати "${point.name}" у чорний список?`, [
+      { text: "Скасувати", style: "cancel" },
+      { text: "В бан", style: "destructive", onPress: async () => {
+          try {
+            await travelApi.addToBlacklist(user.id, point.id);
+            setSelectedPoint(null);
+            Alert.alert("Успіх", "Заклад більше не з'явиться у маршрутах.");
+          } catch (e) { Alert.alert("Помилка", "Не вдалося заблокувати."); }
+      }}
+    ]);
   };
 
   const buildRoute = async () => {
@@ -64,12 +56,8 @@ export default function MapScreen({ navigation, route: navRoute }) {
         duration_type: durationType,
         user_id: user?.id
       });
-      if (!data || !data.geometry) throw new Error("Відсутня геометрія");
       setRoute(data);
-    } catch (e) { 
-      Alert.alert("Помилка", "Не вдалося скласти маршрут."); 
-      console.error(e);
-    }
+    } catch (e) { Alert.alert("Помилка", "Не вдалося скласти маршрут."); }
     finally { setLoading(false); }
   };
 
@@ -78,88 +66,87 @@ export default function MapScreen({ navigation, route: navRoute }) {
       <MapView
         provider={PROVIDER_GOOGLE}
         style={styles.map}
-        initialRegion={{
+        region={{
           latitude: userLocation.latitude,
           longitude: userLocation.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
+          latitudeDelta: 0.04,
+          longitudeDelta: 0.04,
         }}
         onPress={() => setSelectedPoint(null)}
       >
         <Marker coordinate={userLocation} draggable onDragEnd={(e) => setUserLocation(e.nativeEvent.coordinate)} pinColor="black" />
         
-        {route?.points?.map((p, index) => (
+        {route?.points?.map((p, i) => (
           <Marker 
-            key={`m-${index}-${p.id}`} 
+            key={`m-${p.id}-${i}`}
             coordinate={{ latitude: parseFloat(p.latitude), longitude: parseFloat(p.longitude) }} 
             pinColor={selectedPoint?.id === p.id ? "#FFD700" : "#E91E63"}
             onPress={(e) => { e.stopPropagation(); setSelectedPoint(p); }}
           />
         ))}
 
-        {/* ПОКРАЩЕНА ПОЛІЛІНІЯ З КЛЮЧЕМ */}
         {route?.geometry?.coordinates?.length > 0 && (
           <Polyline 
-            key={`poly-${route.geometry.coordinates.length}-${route.total_duration_min}`}
-            coordinates={route.geometry.coordinates.map(c => ({ 
-              latitude: parseFloat(c[1]), 
-              longitude: parseFloat(c[0]) 
-            }))} 
-            strokeWidth={5} 
-            strokeColor="#2196F3" 
+            key={`poly-${route.geometry.coordinates.length}`}
+            coordinates={route.geometry.coordinates.map(c => ({ latitude: c[1], longitude: c[0] }))} 
+            strokeWidth={4} strokeColor="#2196F3" 
           />
         )}
       </MapView>
 
-      {/* ПОВЗУНОК ЧАСУ - ЗАВЖДИ ВГОРІ (БЕЗ УМОВ) */}
-      <View style={styles.durationBar}>
-        {['short', 'medium', 'long'].map(t => (
-          <TouchableOpacity 
-            key={t} 
-            onPress={() => setDurationType(t)} 
-            style={[styles.tBtn, durationType === t && styles.active]}
-          >
-            <Text style={{color: durationType === t ? '#fff' : '#333', fontSize: 13, fontWeight: 'bold'}}>
-              {t === 'short' ? '1 год' : t === 'medium' ? '1-3 год' : '3+ год'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      {/* ВЕРХНЯ ПАНЕЛЬ (МІСТО ТА ЧАС) */}
+      <View style={styles.topContainer}>
+        <View style={styles.citySwitcher}>
+          {Object.keys(cityConfigs).map(key => (
+            <TouchableOpacity key={key} onPress={() => changeCity(key)} style={[styles.cityBtn, currentCity === key && styles.activeGreen]}>
+              <Text style={[styles.cityText, currentCity === key && styles.textWhite]}>{cityConfigs[key].name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.durationBar}>
+          {['short', 'medium', 'long'].map(t => (
+            <TouchableOpacity key={t} onPress={() => setDurationType(t)} style={[styles.tBtn, durationType === t && styles.activeBlue]}>
+              <Text style={{color: durationType === t ? '#fff' : '#333', fontSize: 12, fontWeight: 'bold'}}>
+                {t === 'short' ? '1 год' : t === 'medium' ? '1-3 год' : '3+ год'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      {/* КАРТКА МІСЦЯ З ВИПРАВЛЕНОЮ ВЕРСТКОЮ */}
+      {/* КАРТКА МІСЦЯ */}
       {selectedPoint && (
         <View style={styles.placeCard}>
           <View style={styles.cardHeader}>
-            {/* ХРЕСТИК ЛІВОРУЧ */}
-            <TouchableOpacity onPress={() => setSelectedPoint(null)} style={styles.closeAction}>
-              <Ionicons name="close-circle" size={35} color="#ccc" />
+            <TouchableOpacity onPress={() => setSelectedPoint(null)} style={styles.iconPadding}>
+              <Ionicons name="close-circle" size={32} color="#ccc" />
             </TouchableOpacity>
 
-            <View style={styles.titleContent}>
+            <View style={styles.titleContainer}>
               <Text style={styles.placeTitle} numberOfLines={1}>{selectedPoint.name}</Text>
-              <Text style={styles.placeCategory}>{selectedPoint.category}</Text>
+              <Text style={styles.placeCat}>{selectedPoint.category}</Text>
             </View>
 
-            {/* БАН ПРАВОРУЧ (ОКРЕМО) */}
-            <TouchableOpacity onPress={() => handleAddToBlacklist(selectedPoint)} style={styles.banAction}>
+            <TouchableOpacity onPress={() => handleAddToBlacklist(selectedPoint)} style={styles.iconPadding}>
               <Ionicons name="trash-bin" size={26} color="#FF5252" />
-              <Text style={styles.banText}>В бан</Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.placeBtnMain} onPress={() => openPlaceProfile(selectedPoint.name)}>
-            <Text style={styles.placeBtnText}>Сайт, меню та фото ➔</Text>
+          <TouchableOpacity style={styles.mainPlaceBtn} onPress={() => openPlaceProfile(selectedPoint.name)}>
+            <Text style={styles.btnTextWhite}>Сайт та меню ➔</Text>
           </TouchableOpacity>
         </View>
       )}
 
+      {/* НИЖНЯ ПАНЕЛЬ КНОПОК */}
       {!selectedPoint && (
-        <View style={styles.btnRow}>
-          <TouchableOpacity style={styles.mainBtn} onPress={buildRoute}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Скласти маршрут</Text>}
+        <View style={styles.bottomActions}>
+          <TouchableOpacity style={styles.buildBtn} onPress={buildRoute}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnTextWhite}>Скласти маршрут</Text>}
           </TouchableOpacity>
           {route && (
-            <TouchableOpacity style={styles.subBtn} onPress={() => navigation.navigate('Itinerary', { routeData: route })}>
+            <TouchableOpacity style={styles.listBtn} onPress={() => navigation.navigate('Itinerary', { routeData: route })}>
               <Ionicons name="list" size={26} color="#fff" />
             </TouchableOpacity>
           )}
@@ -172,32 +159,26 @@ export default function MapScreen({ navigation, route: navRoute }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
-  durationBar: { 
-    position: 'absolute', top: 60, flexDirection: 'row', alignSelf: 'center', 
-    backgroundColor: 'white', borderRadius: 25, padding: 5, elevation: 10, zIndex: 100,
-    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 5,
-  },
-  tBtn: { paddingHorizontal: 15, paddingVertical: 10, borderRadius: 20 },
-  active: { backgroundColor: '#2196F3' },
+  topContainer: { position: 'absolute', top: 50, width: '100%', alignItems: 'center', zIndex: 100 },
+  citySwitcher: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 20, padding: 4, elevation: 5, marginBottom: 10 },
+  cityBtn: { paddingHorizontal: 15, paddingVertical: 6, borderRadius: 15 },
+  cityText: { fontSize: 12, fontWeight: 'bold', color: '#666' },
+  durationBar: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 25, padding: 4, elevation: 5 },
+  tBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
+  activeBlue: { backgroundColor: '#2196F3' },
+  activeGreen: { backgroundColor: '#4CAF50' },
+  textWhite: { color: '#fff' },
 
-  placeCard: { 
-    position: 'absolute', bottom: 30, left: 15, right: 15, 
-    backgroundColor: 'white', borderRadius: 25, padding: 20, 
-    elevation: 20, shadowOpacity: 0.3, shadowRadius: 10, zIndex: 200 
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, justifyContent: 'space-between' },
-  closeAction: { padding: 5 },
-  titleContent: { flex: 1, paddingHorizontal: 10 },
-  placeTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  placeCategory: { fontSize: 13, color: '#2196F3', fontWeight: '600', marginTop: 2 },
-  banAction: { alignItems: 'center', minWidth: 50 },
-  banText: { color: '#FF5252', fontSize: 10, fontWeight: 'bold', marginTop: 2 },
+  placeCard: { position: 'absolute', bottom: 30, left: 15, right: 15, backgroundColor: '#fff', borderRadius: 25, padding: 20, elevation: 15, zIndex: 200 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
+  iconPadding: { padding: 5 },
+  titleContainer: { flex: 1, alignItems: 'center', paddingHorizontal: 10 },
+  placeTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'center' },
+  placeCat: { color: '#2196F3', fontSize: 13, fontWeight: '600' },
+  mainPlaceBtn: { backgroundColor: '#2196F3', padding: 15, borderRadius: 15, alignItems: 'center' },
 
-  placeBtnMain: { backgroundColor: '#2196F3', paddingVertical: 15, borderRadius: 15, alignItems: 'center' },
-  placeBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-
-  btnRow: { position: 'absolute', bottom: 40, flexDirection: 'row', width: '90%', alignSelf: 'center', justifyContent: 'space-between', zIndex: 50 },
-  mainBtn: { backgroundColor: '#2196F3', padding: 18, borderRadius: 30, flex: 1, alignItems: 'center', marginRight: 10, elevation: 5 },
-  subBtn: { backgroundColor: '#4CAF50', padding: 18, borderRadius: 30, width: 65, alignItems: 'center', elevation: 5 },
-  btnText: { color: 'white', fontSize: 18, fontWeight: 'bold' }
+  bottomActions: { position: 'absolute', bottom: 40, flexDirection: 'row', width: '90%', alignSelf: 'center' },
+  buildBtn: { backgroundColor: '#2196F3', flex: 1, padding: 18, borderRadius: 30, alignItems: 'center', marginRight: 10, elevation: 5 },
+  listBtn: { backgroundColor: '#4CAF50', width: 65, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 5 },
+  btnTextWhite: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });

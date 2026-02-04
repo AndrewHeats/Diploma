@@ -1,19 +1,20 @@
 import React, { createContext, useState } from 'react';
 
-// Створюємо контекст
 export const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
-  // 1. ДАНІ КОРИСТУВАЧА (id, email)
   const [user, setUser] = useState(null);
+  
+  // Дані для міст
+  const cityConfigs = {
+    Lviv: { latitude: 49.8397, longitude: 24.0297, name: 'Львів' },
+    Kyiv: { latitude: 50.4501, longitude: 30.5234, name: 'Київ' }
+  };
 
-  // 2. ЛОКАЦІЯ (Початкова точка — центр Львова, Ратуша)
-  const [userLocation, setUserLocation] = useState({
-    latitude: 49.8397,
-    longitude: 24.0297,
-  });
+  const [currentCity, setCurrentCity] = useState('Lviv');
+  const [userLocation, setUserLocation] = useState(cityConfigs.Lviv);
+  const [durationType, setDurationType] = useState('medium');
 
-  // 3. ОСНОВНІ КАТЕГОРІЇ МАРШРУТУ (preferences)
   const [preferences, setPreferences] = useState({
     culture: true,
     food: true,
@@ -21,47 +22,37 @@ export const AppProvider = ({ children }) => {
     other: false,
   });
 
-  // 4. УЛЮБЛЕНІ КУХНІ (cuisinePreferences)
-  // Синхронізовано з ProfileScreen та seed_osm.py
   const [cuisinePreferences, setCuisinePreferences] = useState({
+    asian: false,
+    georgian: false,
+    greek: false,
     ukrainian: false,
     italian: false,
-    georgian: false,  // Додано
-    asian: false,     // Додано
-    greek: false,     // Додано
     jewish: false,
     regional: false,
     coffee_shop: false,
     burger: false,
   });
 
-  // 5. ТИП ТРИВАЛОСТІ (short, medium, long)
-  const [durationType, setDurationType] = useState('medium');
+  // Функція зміни міста
+  const changeCity = (cityKey) => {
+    setCurrentCity(cityKey);
+    setUserLocation({
+      latitude: cityConfigs[cityKey].latitude,
+      longitude: cityConfigs[cityKey].longitude,
+    });
+  };
 
   return (
-    <AppContext.Provider
-      value={{
-        // Дані користувача
-        user,
-        setUser,
-        
-        // Геопозиція
-        userLocation,
-        setUserLocation,
-        
-        // Фільтри категорій
-        preferences,
-        setPreferences,
-        
-        // Фільтри кухонь
-        cuisinePreferences,
-        setCuisinePreferences,
-        
-        // Тривалість прогулянки
-        durationType,
-        setDurationType,
-      }}
-    >
+    <AppContext.Provider value={{
+      user, setUser,
+      currentCity, changeCity,
+      userLocation, setUserLocation,
+      preferences, setPreferences,
+      cuisinePreferences, setCuisinePreferences,
+      durationType, setDurationType,
+      cityConfigs
+    }}>
       {children}
     </AppContext.Provider>
   );

@@ -30,9 +30,17 @@ def login(user: schemas.UserCreate, db: Session = Depends(database.get_db)):
 
 @app.post("/generate-route/", response_model=schemas.RouteResponse)
 async def generate_route(req: schemas.RouteRequest, db: Session = Depends(database.get_db)):
+    print(f"🚀 Запит на маршрут: {req.start_lat}, {req.start_lon} для юзера {req.user_id}")
+
     result = await route_manager.create_full_route(db, req)
-    if not result:
-        raise HTTPException(status_code=404, detail="Маршрут не знайдено")
+
+    if not result or not result.get("points"):
+        # Якщо результат None, це значить база порожня в цьому радіусі
+        raise HTTPException(
+            status_code=404,
+            detail="В цьому районі не знайдено місць. Спробуйте змінити початкову точку або збільшити радіус."
+        )
+
     return result
 
 # --- 3. КЕРУВАННЯ ІСТОРІЄЮ ---
