@@ -4,39 +4,31 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../store/appContext';
 
-// Екрани
 import MapScreen from '../screens/mapScreen';
 import ProfileScreen from '../screens/profileScreen';
 import ItineraryScreen from '../screens/itineraryScreen';
 import HistoryScreen from '../screens/historyScreen';
 import AuthScreen from '../screens/authScreen';
 import BlacklistScreen from '../screens/blacklistScreen';
+import SettingsScreen from '../screens/settingsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-// Стек Мапи (Мапа + Деталі)
 function MapStack() {
   return (
-    <Stack.Navigator screenOptions={{ 
-      headerStyle: { backgroundColor: '#2196F3' }, 
-      headerTintColor: '#fff',
-      headerTitleStyle: { fontWeight: 'bold' } 
-    }}>
-      <Stack.Screen name="Map" component={MapScreen} options={{ title: 'Мапа Львова' }} />
-      <Stack.Screen name="Itinerary" component={ItineraryScreen} options={{ title: 'Ваш Маршрут' }} />
+    <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#2196F3' }, headerTintColor: '#fff' }}>
+      <Stack.Screen name="Map" component={MapScreen} options={{ title: 'Мапа України' }} />
+      <Stack.Screen name="Itinerary" component={ItineraryScreen} options={{ title: 'Деталі маршруту' }} />
     </Stack.Navigator>
   );
 }
 
-// Стек Профілю (Налаштування + Бан-лист)
 function ProfileStack() {
   return (
-    <Stack.Navigator screenOptions={{ 
-      headerStyle: { backgroundColor: '#2196F3' }, 
-      headerTintColor: '#fff' 
-    }}>
+    <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#2196F3' }, headerTintColor: '#fff' }}>
       <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ title: 'Мій Профіль' }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Налаштування подорожі' }} />
       <Stack.Screen name="Blacklist" component={BlacklistScreen} options={{ title: 'Чорний список' }} />
     </Stack.Navigator>
   );
@@ -52,11 +44,13 @@ export const AppNavigator = () => {
       ) : (
         <Stack.Screen name="Main">
           {() => (
-            <Tab.Navigator screenOptions={{ 
-              tabBarActiveTintColor: '#2196F3', 
-              headerShown: false,
-              tabBarStyle: { height: 60, paddingBottom: 10 }
-            }}>
+            <Tab.Navigator 
+              screenOptions={{ 
+                tabBarActiveTintColor: '#2196F3', 
+                headerShown: false,
+                unmountOnBlur: true // Скидає стан при виході з таба
+              }}
+            >
               <Tab.Screen 
                 name="MapTab" 
                 component={MapStack} 
@@ -69,8 +63,7 @@ export const AppNavigator = () => {
                 name="Історія" 
                 component={HistoryScreen} 
                 options={{ 
-                  headerShown: true, 
-                  title: 'Минулі прогулянки',
+                  headerShown: true, title: 'Історія',
                   tabBarIcon: ({color, size}) => <Ionicons name="time" size={size} color={color} /> 
                 }} 
               />
@@ -80,6 +73,12 @@ export const AppNavigator = () => {
                 options={{ 
                   tabBarIcon: ({color, size}) => <Ionicons name="person" size={size} color={color} /> 
                 }} 
+                listeners={({ navigation }) => ({
+                  tabPress: (e) => {
+                    // Примусовий скид до ProfileMain при кожному кліку на таб
+                    navigation.navigate('Профіль', { screen: 'ProfileMain' });
+                  },
+                })}
               />
             </Tab.Navigator>
           )}

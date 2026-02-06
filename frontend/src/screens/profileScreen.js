@@ -24,15 +24,14 @@ export default function ProfileScreen({ navigation }) {
 
   const [stats, setStats] = useState({ count: 0, totalTime: 0 });
 
-  // Основні категорії за скриптом seed_db.py
+  // Категорії (зробив опис універсальним для всієї України)
   const categories = [
     { id: 'culture', label: 'Культура', icon: 'library-outline', subtext: 'Музеї, храми, театри' },
     { id: 'food', label: 'Харчування', icon: 'restaurant-outline', subtext: 'Сніданки, обіди, вечері' },
     { id: 'nature', label: 'Природа', icon: 'leaf-outline', subtext: 'Парки та площі' },
-    { id: 'other', label: 'Інше', icon: 'ellipsis-horizontal-outline', subtext: 'Цікавинки Львова' },
+    { id: 'other', label: 'Інше', icon: 'ellipsis-horizontal-outline', subtext: 'Цікаві локації міста' },
   ];
 
-  // СПИСОК КУХОНЬ
   const cuisineTypes = [
     { id: 'ukrainian', label: 'Українська' },
     { id: 'italian', label: 'Італійська' },
@@ -63,10 +62,7 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const toggleCuisine = (id) => {
-    setCuisinePreferences({
-      ...cuisinePreferences,
-      [id]: !cuisinePreferences[id]
-    });
+    setCuisinePreferences({ ...cuisinePreferences, [id]: !cuisinePreferences[id] });
   };
 
   const handleLogout = () => {
@@ -80,7 +76,7 @@ export default function ProfileScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
         
-        {/* Хедер із статистикою */}
+        {/* 1. Хедер із статистикою */}
         <View style={styles.header}>
           <Ionicons name="person-circle" size={90} color="#2196F3" />
           <Text style={styles.email}>{user?.email || 'Мій Профіль'}</Text>
@@ -98,9 +94,28 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
 
-        {/* СЕКЦІЯ 1: ТИП МАРШРУТУ */}
+        {/* 2. ГОЛОВНЕ МЕНЮ (НАЛАШТУВАННЯ МІСТА) */}
+        <View style={styles.menu}>
+          <TouchableOpacity 
+            style={styles.menuItemMain} 
+            onPress={() => navigation.navigate('Settings')}
+          >
+            <View style={styles.menuLeft}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="location" size={20} color="#fff" />
+              </View>
+              <View>
+                <Text style={styles.menuTextBold}>Налаштування подорожі</Text>
+                <Text style={styles.menuSubtext}>Змінити місто та час прогулянки</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#2196F3" />
+          </TouchableOpacity>
+        </View>
+
+        {/* 3. СЕКЦІЯ: ТИП МАРШРУТУ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Тип маршруту</Text>
+          <Text style={styles.sectionTitle}>Які місця шукати?</Text>
           <View style={styles.listContainer}>
             {categories.map((cat) => (
               <TouchableOpacity 
@@ -115,12 +130,13 @@ export default function ProfileScreen({ navigation }) {
                   <Text style={[styles.prefLabel, preferences[cat.id] && styles.textWhite]}>{cat.label}</Text>
                   <Text style={[styles.prefSubtext, preferences[cat.id] && styles.textLightBlue]}>{cat.subtext}</Text>
                 </View>
+                {preferences[cat.id] && <Ionicons name="checkmark-circle" size={20} color="#fff" />}
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* СЕКЦІЯ 2: УЛЮБЛЕНА КУХНЯ */}
+        {/* 4. СЕКЦІЯ: УЛЮБЛЕНА КУХНЯ */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Улюблена кухня</Text>
           <View style={styles.cuisineContainer}>
@@ -138,32 +154,16 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
 
-        {/* МЕНЮ */}
-        <View style={styles.menu}>
-          {/* Перехід до історії */}
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Історія')}>
-            <View style={styles.menuLeft}>
-              <Ionicons name="time-outline" size={22} color="#555" />
-              <Text style={styles.menuText}>Історія подорожей</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#ccc" />
+        {/* 5. ДОДАТКОВЕ МЕНЮ */}
+        <View style={styles.menuFooter}>
+          <TouchableOpacity style={styles.footerItem} onPress={() => navigation.navigate('Blacklist')}>
+            <Ionicons name="ban-outline" size={20} color="#555" />
+            <Text style={styles.footerText}>Чорний список</Text>
           </TouchableOpacity>
-
-          {/* НОВО: Перехід до чорного списку */}
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Blacklist')}>
-            <View style={styles.menuLeft}>
-              <Ionicons name="ban-outline" size={22} color="#555" />
-              <Text style={styles.menuText}>Чорний список</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#ccc" />
-          </TouchableOpacity>
-
-          {/* Вихід */}
-          <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]} onPress={handleLogout}>
-            <View style={styles.menuLeft}>
-              <Ionicons name="log-out-outline" size={22} color="#FF5252" />
-              <Text style={[styles.menuText, { color: '#FF5252' }]}>Вийти з акаунта</Text>
-            </View>
+          
+          <TouchableOpacity style={styles.footerItem} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color="#FF5252" />
+            <Text style={[styles.footerText, { color: '#FF5252' }]}>Вийти</Text>
           </TouchableOpacity>
         </View>
 
@@ -174,34 +174,57 @@ export default function ProfileScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FA' },
-  scroll: { paddingBottom: 30 },
-  header: { backgroundColor: '#fff', alignItems: 'center', padding: 25, borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 3 },
-  email: { fontSize: 18, fontWeight: 'bold', marginVertical: 10 },
-  statsRow: { flexDirection: 'row', marginTop: 20, width: '100%', justifyContent: 'center' },
-  statItem: { alignItems: 'center', paddingHorizontal: 20 },
+  scroll: { paddingBottom: 40 },
+  header: { 
+    backgroundColor: '#fff', alignItems: 'center', padding: 25, 
+    borderBottomLeftRadius: 30, borderBottomRightRadius: 30, elevation: 5,
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10
+  },
+  email: { fontSize: 18, fontWeight: 'bold', marginVertical: 10, color: '#333' },
+  statsRow: { flexDirection: 'row', marginTop: 15, width: '100%', justifyContent: 'center' },
+  statItem: { alignItems: 'center', paddingHorizontal: 25 },
   statDivider: { width: 1, height: '80%', backgroundColor: '#eee' },
-  statNum: { fontSize: 20, fontWeight: 'bold', color: '#2196F3' },
-  statLabel: { fontSize: 12, color: '#999' },
+  statNum: { fontSize: 22, fontWeight: 'bold', color: '#2196F3' },
+  statLabel: { fontSize: 12, color: '#999', marginTop: 4 },
   
-  section: { paddingHorizontal: 20, paddingTop: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', marginBottom: 15 },
-  listContainer: { width: '100%' },
-  prefCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 15, marginBottom: 10, elevation: 2, borderWidth: 1, borderColor: '#eee' },
+  menu: { paddingHorizontal: 20, marginTop: 25 },
+  menuItemMain: { 
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
+    backgroundColor: '#fff', padding: 20, borderRadius: 20, elevation: 3
+  },
+  menuLeft: { flexDirection: 'row', alignItems: 'center' },
+  iconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2196F3', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  menuTextBold: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+  menuSubtext: { fontSize: 12, color: '#777', marginTop: 2 },
+
+  section: { paddingHorizontal: 20, paddingTop: 25 },
+  sectionTitle: { fontSize: 17, fontWeight: 'bold', color: '#333', marginBottom: 15 },
+  prefCard: { 
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', 
+    padding: 15, borderRadius: 18, marginBottom: 12, elevation: 2, 
+    borderWidth: 1, borderColor: '#f0f0f0' 
+  },
   prefCardActive: { backgroundColor: '#2196F3', borderColor: '#2196F3' },
   prefIconBox: { width: 40, alignItems: 'center' },
-  prefTextBox: { flex: 1, marginLeft: 15 },
+  prefTextBox: { flex: 1, marginLeft: 10 },
   prefLabel: { fontSize: 15, fontWeight: 'bold', color: '#333' },
   prefSubtext: { fontSize: 11, color: '#777', marginTop: 2 },
   textWhite: { color: '#fff' },
   textLightBlue: { color: '#e3f2fd' },
 
   cuisineContainer: { flexDirection: 'row', flexWrap: 'wrap' },
-  cuisineTag: { backgroundColor: '#fff', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginRight: 8, marginBottom: 8, elevation: 1, borderWidth: 1, borderColor: '#eee' },
+  cuisineTag: { 
+    backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, 
+    borderRadius: 25, marginRight: 10, marginBottom: 10, elevation: 1, 
+    borderWidth: 1, borderColor: '#eee' 
+  },
   cuisineTagActive: { backgroundColor: '#4CAF50', borderColor: '#4CAF50' },
-  cuisineText: { fontSize: 13, color: '#555' },
+  cuisineText: { fontSize: 13, color: '#555', fontWeight: '500' },
 
-  menu: { backgroundColor: '#fff', marginHorizontal: 20, marginTop: 20, borderRadius: 20, elevation: 2 },
-  menuItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#f8f8f8' },
-  menuLeft: { flexDirection: 'row', alignItems: 'center' },
-  menuText: { marginLeft: 15, fontSize: 15, color: '#444' }
+  menuFooter: { 
+    flexDirection: 'row', justifyContent: 'space-around', 
+    marginTop: 30, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 20 
+  },
+  footerItem: { flexDirection: 'row', alignItems: 'center', padding: 10 },
+  footerText: { marginLeft: 8, fontSize: 14, fontWeight: '600', color: '#555' }
 });
