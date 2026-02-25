@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List
 import models, schemas, database, crud
-from services import route_manager
+from services import route_manager, recommender
 
 app = FastAPI(title="Travel App API - Lviv Edition")
 
@@ -115,3 +115,32 @@ def remove_from_blacklist(data: dict, db: Session = Depends(database.get_db)):
         db.delete(ban_record)
         db.commit()
     return {"status": "unblocked"}
+
+
+# --- 5. ВПОДОБАНІ МІСЦЯ ТА AI РЕКОМЕНДАЦІЇ ---
+
+@app.post("/places/{place_id}/like")
+def toggle_place_like(place_id: int, user_id: int, db: Session = Depends(database.get_db)):
+    existing = db.query(models.UserLikedPlace).filter(
+        models.UserLikedPlace.user_id == user_id,
+        models.UserLikedPlace.place_id == place_id
+    ).first()
+
+    if existing:
+        db.delete(existing)
+        db.commit()
+        return {"status": "unliked"}
+
+    new_like = models.UserLikedPlace(user_id=user_id, place_id=place_id)
+    db.add(new_like)
+    db.commit()
+    return {"status": "liked"}
+
+
+
+@app.get("/recommendations/{user_id}/{city_name}")
+def get_ai_recommendations(user_id: int, city_name: str, db: Session = Depends(database.get_db)):
+    """
+    Ендпоїнт делегує роботу алгоритму рекомендацій.
+    """
+    return recommender.get_city_recommendations(user_id=user_id, city_name=city_name, db=db)

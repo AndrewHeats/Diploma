@@ -34,3 +34,10 @@ class UserBlacklist(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     place_id = Column(Integer, ForeignKey("places.id"))
+
+class UserLikedPlace(Base):
+    __tablename__ = "user_liked_places"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    place_id = Column(Integer, ForeignKey("places.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

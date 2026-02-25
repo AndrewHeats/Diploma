@@ -29,5 +29,13 @@ export const travelApi = {
     apiClient.post('/blacklist/add', { user_id: userId, place_id: placeId }).then(r => r.data),
 
   removeFromBlacklist: (userId, placeId) => 
-    apiClient.delete('/blacklist/remove', { data: { user_id: userId, place_id: placeId } }).then(r => r.data)
+    apiClient.delete('/blacklist/remove', { data: { user_id: userId, place_id: placeId } }).then(r => r.data),
+
+  // Лайк конкретного місця
+  togglePlaceLike: (placeId, userId) => 
+    apiClient.post(`/places/${placeId}/like`, null, { params: { user_id: userId } }).then(r => r.data),
+
+  // Отримання рекомендацій на основі вподобань
+  getRecommendations: (userId, cityName) => 
+    apiClient.get(`/recommendations/${userId}/${cityName}`).then(r => r.data),
 };
