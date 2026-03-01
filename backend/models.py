@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
 from database import Base
 
@@ -26,7 +27,6 @@ class SavedRoute(Base):
     total_duration = Column(Integer)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     points_summary = Column(String)
-    # Зберігаємо весь об'єкт маршруту для відтворення на мапі
     route_data = Column(JSON)
 
 class UserBlacklist(Base):
@@ -41,3 +41,15 @@ class UserLikedPlace(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     place_id = Column(Integer, ForeignKey("places.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# --- НОВЕ: ЧАТ ---
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    city_name = Column(String, index=True)  # "Lviv", "Kyiv"
+    content = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Зв'язок з юзером, щоб знати email автора
+    user = relationship("User")

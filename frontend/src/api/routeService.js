@@ -12,6 +12,7 @@ export const travelApi = {
   generateRoute: (params) => 
     apiClient.post('/generate-route/', params).then(r => r.data),
 
+  // --- ІСТОРІЯ ---
   getHistory: (userId) => 
     apiClient.get(`/history/${userId}`).then(r => r.data),
 
@@ -21,7 +22,11 @@ export const travelApi = {
   updateRouteName: (routeId, newName) => 
     apiClient.patch(`/history/${routeId}`, { route_name: newName }).then(r => r.data),
 
-  // --- ЧОРНИЙ СПИСОК (Оновлено для роботи через apiClient) ---
+  // Нове: Лайк цілого маршруту (історія)
+  toggleLikeRoute: (routeId) => 
+    apiClient.patch(`/history/${routeId}/like`).then(r => r.data),
+
+  // --- ЧОРНИЙ СПИСОК ---
   getBlacklist: (userId) => 
     apiClient.get(`/blacklist/${userId}`).then(r => r.data),
 
@@ -31,11 +36,17 @@ export const travelApi = {
   removeFromBlacklist: (userId, placeId) => 
     apiClient.delete('/blacklist/remove', { data: { user_id: userId, place_id: placeId } }).then(r => r.data),
 
-  // Лайк конкретного місця
+  // --- ВПОДОБАННЯ МІСЦЬ (AI) ---
   togglePlaceLike: (placeId, userId) => 
     apiClient.post(`/places/${placeId}/like`, null, { params: { user_id: userId } }).then(r => r.data),
 
-  // Отримання рекомендацій на основі вподобань
   getRecommendations: (userId, cityName) => 
     apiClient.get(`/recommendations/${userId}/${cityName}`).then(r => r.data),
+
+  // --- ЧАТ (НОВЕ) ---
+  getChatMessages: (cityName) => 
+    apiClient.get(`/chat/${cityName}`).then(r => r.data),
+
+  sendMessage: (userId, cityName, content) => 
+    apiClient.post('/chat/', { user_id: userId, city_name: cityName, content }).then(r => r.data),
 };

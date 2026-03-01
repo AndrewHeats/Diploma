@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import List, Optional, Any
-
 from pydantic import BaseModel, Field, EmailStr
 
 
@@ -48,7 +47,7 @@ class RouteStep(BaseModel):
     to_name: str
     duration_min: int
     distance_m: int
-    stay_min: int  # Додано для синхронізації часу
+    stay_min: int
 
 
 class RouteRequest(BaseModel):
@@ -63,18 +62,19 @@ class RouteRequest(BaseModel):
 class RouteResponse(BaseModel):
     points: List[Place]
     geometry: Any
-    itinerary: List[RouteStep]
+    itinerary: List[dict]  # або List[RouteStep]
     total_duration_min: int
 
 
-# --- ІСТОРІЯ ПОДОРОЖЕЙ ---
+# --- ІСТОРІЯ ---
 class HistoryItem(BaseModel):
     id: int
-    route_name: Optional[str] = "Без назви"
-    total_duration: Optional[int] = 0
-    points_summary: Optional[str] = ""
-    created_at: Optional[datetime] = None
-    route_data: Optional[Any] = None
+    route_name: str
+    total_duration: int
+    created_at: datetime
+    points_summary: str
+    route_data: Any  # JSON об'єкт маршруту
+    is_liked: bool = False  # Поле для лайків маршрутів
 
     class Config:
         from_attributes = True
@@ -82,3 +82,21 @@ class HistoryItem(BaseModel):
 
 class UpdateRouteName(BaseModel):
     route_name: str
+
+
+# --- ЧАТ (НОВЕ) ---
+class MessageCreate(BaseModel):
+    content: str
+    city_name: str
+    user_id: int
+
+
+class MessageResponse(BaseModel):
+    id: int
+    content: str
+    city_name: str
+    created_at: datetime
+    user_email: str
+
+    class Config:
+        from_attributes = True
